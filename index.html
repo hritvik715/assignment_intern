@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart City Air Quality Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .status-item {
+            display: inline-block;
+            margin-right: 20px;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-good { background: #4CAF50; }
+        .status-warning { background: #FF9800; }
+        .status-error { background: #F44336; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        #airQualityCanvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            width: 100%;
+            height: 300px;
+        }
+
+        .location-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .location-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            background: #4CAF50;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .location-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .aqi-display {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .aqi-good { background: #E8F5E8; color: #2E7D32; }
+        .aqi-moderate { background: #FFF8E1; color: #F57C00; }
+        .aqi-unhealthy { background: #FFEBEE; color: #C62828; }
+
+        .recommendations {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .recommendations h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .recommendations ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .recommendations li {
+            padding: 5px 0;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .recommendations li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .data-card {
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .data-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .data-card h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .data-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 Smart City Air Quality Monitor</h1>
+            <p>Real-time air quality monitoring with intelligent recommendations</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-indicator status-good" id="locationStatus"></span>
+                <span id="locationText">Getting location...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator status-good" id="networkStatus"></span>
+                <span id="networkText">Network: Good</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator status-good" id="dataStatus"></span>
+                <span id="dataText">Data: Loading...</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>📊 Air Quality Visualization</h2>
+                <canvas id="airQualityCanvas"></canvas>
+                <div id="canvasInfo" class="loading">Generating air quality visualization...</div>
+            </div>
+
+            <div class="card">
+                <h2>📍 Your Location</h2>
+                <div class="location-info">
+                    <div class="location-icon"></div>
+                    <div>
+                        <div id="locationDisplay">Detecting location...</div>
+                        <div id="coordinatesDisplay" style="font-size: 0.8em; color: #666;"></div>
+                    </div>
+                </div>
+                
+                <div id="aqiDisplay" class="aqi-display aqi-good" style="display: none;">
+                    <div>Air Quality Index</div>
+                    <div style="font-size: 1.5em; margin-top: 5px;">--</div>
+                    <div style="font-size: 0.9em; margin-top: 5px;">Good</div>
+                </div>
+
+                <div class="recommendations">
+                    <h3>💡 Smart Recommendations</h3>
+                    <ul id="recommendationsList">
+                        <li>Analyzing air quality data...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-grid" id="dataGrid">
+            
+        </div>
+    </div>
+
+    <script>
+        class AirQualityMonitor {
+            constructor() {
+                this.canvas = document.getElementById('airQualityCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentLocation = null;
+                this.airQualityData = null;
+                this.networkInfo = null;
+                this.isLowBandwidth = false;
+                
+                this.init();
+            }
+
+            async init() {
+                
+                this.setupCanvas();
+                
+                // Initialize APIs
+                await this.initializeNetworkInfo();
+                await this.initializeGeolocation();
+                this.setupIntersectionObserver();
+                this.startBackgroundTasks();
+                
+                // Start data simulation
+                this.simulateAirQualityData();
+            }
+
+            setupCanvas() {
+                const canvas = this.canvas;
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * window.devicePixelRatio;
+                canvas.height = rect.height * window.devicePixelRatio;
+                this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            }
+
+            
+            async initializeNetworkInfo() {
+                if ('connection' in navigator) {
+                    this.networkInfo = navigator.connection;
+                    this.updateNetworkStatus();
+                    
+                    this.networkInfo.addEventListener('change', () => {
+                        this.updateNetworkStatus();
+                    });
+                } else {
+                    this.updateStatus('networkStatus', 'warning', 'Network API not supported');
+                }
+            }
+
+            updateNetworkStatus() {
+                if (this.networkInfo) {
+                    const effectiveType = this.networkInfo.effectiveType;
+                    const downlink = this.networkInfo.downlink;
+                    
+                    this.isLowBandwidth = effectiveType === 'slow-2g' || effectiveType === '2g' || downlink < 1;
+                    
+                    const status = this.isLowBandwidth ? 'warning' : 'good';
+                    const text = `Network: ${effectiveType} (${downlink}Mbps)`;
+                    
+                    this.updateStatus('networkStatus', status, text);
+                    
+                    
+                    if (this.isLowBandwidth) {
+                        this.updateDataCollectionFrequency(30000); // 30 seconds
+                    } else {
+                        this.updateDataCollectionFrequency(10000); // 10 seconds
+                    }
+                }
+            }
+
+            // Geolocation API
+            async initializeGeolocation() {
+                if ('geolocation' in navigator) {
+                    try {
+                        const position = await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 600000
+                            });
+                        });
+                        
+                        this.currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        
+                        this.updateLocationDisplay();
+                        this.updateStatus('locationStatus', 'good', 'Location acquired');
+                        
+                        // Watch for location changes
+                        navigator.geolocation.watchPosition(
+                            (position) => {
+                                this.currentLocation = {
+                                    lat: position.coords.latitude,
+                                    lng: position.coords.longitude,
+                                    accuracy: position.coords.accuracy
+                                };
+                                this.updateLocationDisplay();
+                            },
+                            (error) => console.warn('Location watch error:', error),
+                            { enableHighAccuracy: false, maximumAge: 300000 }
+                        );
+                        
+                    } catch (error) {
+                        this.updateStatus('locationStatus', 'error', 'Location denied');
+                        this.handleLocationError(error);
+                    }
+                } else {
+                    this.updateStatus('locationStatus', 'error', 'Geolocation not supported');
+                }
+            }
+
+            updateLocationDisplay() {
+                if (this.currentLocation) {
+                    const { lat, lng, accuracy } = this.currentLocation;
+                    document.getElementById('locationDisplay').textContent = 
+                        `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                    document.getElementById('coordinatesDisplay').textContent = 
+                        `Accuracy: ±${Math.round(accuracy)}m`;
+                }
+            }
+
+            handleLocationError(error) {
+                const errorMessages = {
+                    1: 'Location access denied by user',
+                    2: 'Location information unavailable',
+                    3: 'Location request timed out'
+                };
+                
+                document.getElementById('locationDisplay').textContent = 
+                    errorMessages[error.code] || 'Location error';
+                
+                // Use default location (Bengaluru)
+                this.currentLocation = { lat: 12.9716, lng: 77.5946, accuracy: 1000 };
+                this.updateLocationDisplay();
+            }
+
+           
+            setupIntersectionObserver() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            
+                            // Lazy load data for visible cards
+                            if (entry.target.classList.contains('data-card')) {
+                                this.loadDataForCard(entry.target);
+                            }
+                        }
+                    });
+                }, {
+                    threshold: 0.1,
+                    rootMargin: '50px'
+                });
+
+               
+                document.querySelectorAll('.data-card').forEach(card => {
+                    observer.observe(card);
+                });
+            }
+
+           
+            startBackgroundTasks() {
+                if ('requestIdleCallback' in window) {
+                    this.scheduleBackgroundTask();
+                } else {
+                   
+                    setTimeout(() => this.performBackgroundTasks(), 1000);
+                }
+            }
+
+            scheduleBackgroundTask() {
+                requestIdleCallback((deadline) => {
+                    while (deadline.timeRemaining() > 0) {
+                        this.performBackgroundTasks();
+                        break;
+                    }
+                    
+                    
+                    setTimeout(() => this.scheduleBackgroundTask(), 5000);
+                });
+            }
+
+            performBackgroundTasks() {
+                
+                this.updateAirQualityVisualization();
+                
+                
+                this.processAirQualityData();
+                
+                
+                this.updateRecommendations();
+            }
+
+           
+            updateAirQualityVisualization() {
+                const canvas = this.canvas;
+                const ctx = this.ctx;
+                const width = canvas.width / window.devicePixelRatio;
+                const height = canvas.height / window.devicePixelRatio;
+                
+               
+                ctx.clearRect(0, 0, width, height);
+                
+               
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, '#e3f2fd');
+                gradient.addColorStop(1, '#f8f9fa');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+                
+               
+                this.drawAirQualityZones(ctx, width, height);
+                
+                
+                if (this.currentLocation) {
+                    this.drawLocationMarker(ctx, width, height);
+                }
+                
+                
+                this.drawAirQualityDataPoints(ctx, width, height);
+                
+               
+                document.getElementById('canvasInfo').textContent = 
+                    `Last updated: ${new Date().toLocaleTimeString()}`;
+            }
+
+            drawAirQualityZones(ctx, width, height) {
+                const zones = [
+                    { color: '#4CAF50', alpha: 0.3, label: 'Good' },
+                    { color: '#FFEB3B', alpha: 0.3, label: 'Moderate' },
+                    { color: '#FF9800', alpha: 0.3, label: 'Unhealthy' },
+                    { color: '#F44336', alpha: 0.3, label: 'Hazardous' }
+                ];
+                
+                zones.forEach((zone, index) => {
+                    const zoneHeight = height / zones.length;
+                    const y = index * zoneHeight;
+                    
+                    ctx.fillStyle = zone.color;
+                    ctx.globalAlpha = zone.alpha;
+                    ctx.fillRect(0, y, width, zoneHeight);
+                    
+                    // Add zone label
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = zone.color;
+                    ctx.font = '12px Arial';
+                    ctx.fillText(zone.label, 10, y + 20);
+                });
+            }
+
+            drawLocationMarker(ctx, width, height) {
+                const x = width / 2;
+                const y = height / 2;
+                
+                // Draw pulsing circle
+                const time = Date.now();
+                const pulse = Math.sin(time * 0.005) * 0.3 + 0.7;
+                
+                ctx.globalAlpha = pulse;
+                ctx.fillStyle = '#2196F3';
+                ctx.beginPath();
+                ctx.arc(x, y, 15, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Draw center dot
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#1976D2';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            drawAirQualityDataPoints(ctx, width, height) {
+                if (!this.airQualityData) return;
+                
+                const dataPoints = this.airQualityData.hourlyData;
+                const pointWidth = width / dataPoints.length;
+                
+                // Draw line chart
+                ctx.strokeStyle = '#1976D2';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                dataPoints.forEach((point, index) => {
+                    const x = index * pointWidth + pointWidth / 2;
+                    const y = height - (point.aqi / 300) * height;
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    // Draw data point
+                    ctx.fillStyle = this.getAQIColor(point.aqi);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+                
+                ctx.stroke();
+            }
+
+            getAQIColor(aqi) {
+                if (aqi <= 50) return '#4CAF50';
+                if (aqi <= 100) return '#FFEB3B';
+                if (aqi <= 150) return '#FF9800';
+                return '#F44336';
+            }
+
+            // Simulate air quality data
+            simulateAirQualityData() {
+                const generateHourlyData = () => {
+                    const data = [];
+                    for (let i = 0; i < 24; i++) {
+                        data.push({
+                            hour: i,
+                            aqi: Math.floor(Math.random() * 150) + 20,
+                            pm25: Math.floor(Math.random() * 50) + 10,
+                            pm10: Math.floor(Math.random() * 100) + 20,
+                            o3: Math.floor(Math.random() * 80) + 10,
+                            no2: Math.floor(Math.random() * 40) + 5,
+                            so2: Math.floor(Math.random() * 20) + 2
+                        });
+                    }
+                    return data;
+                };
+                
+                this.airQualityData = {
+                    currentAQI: Math.floor(Math.random() * 100) + 25,
+                    hourlyData: generateHourlyData(),
+                    lastUpdated: new Date()
+                };
+                
+                this.updateAQIDisplay();
+                this.updateDataCards();
+                this.updateStatus('dataStatus', 'good', 'Data updated');
+            }
+
+            updateAQIDisplay() {
+                if (!this.airQualityData) return;
+                
+                const aqi = this.airQualityData.currentAQI;
+                const display = document.getElementById('aqiDisplay');
+                
+                display.style.display = 'block';
+                display.querySelector('div:nth-child(2)').textContent = aqi;
+                
+                // Update color and status
+                if (aqi <= 50) {
+                    display.className = 'aqi-display aqi-good';
+                    display.querySelector('div:nth-child(3)').textContent = 'Good';
+                } else if (aqi <= 100) {
+                    display.className = 'aqi-display aqi-moderate';
+                    display.querySelector('div:nth-child(3)').textContent = 'Moderate';
+                } else {
+                    display.className = 'aqi-display aqi-unhealthy';
+                    display.querySelector('div:nth-child(3)').textContent = 'Unhealthy';
+                }
+            }
+
+            updateDataCards() {
+                const dataGrid = document.getElementById('dataGrid');
+                const currentData = this.airQualityData.hourlyData[new Date().getHours()];
+                
+                const cards = [
+                    { title: 'PM2.5', value: currentData.pm25, unit: 'μg/m³' },
+                    { title: 'PM10', value: currentData.pm10, unit: 'μg/m³' },
+                    { title: 'Ozone (O₃)', value: currentData.o3, unit: 'μg/m³' },
+                    { title: 'Nitrogen Dioxide', value: currentData.no2, unit: 'μg/m³' },
+                    { title: 'Sulfur Dioxide', value: currentData.so2, unit: 'μg/m³' },
+                    { title: 'Temperature', value: Math.floor(Math.random() * 15) + 20, unit: '°C' },
+                    { title: 'Humidity', value: Math.floor(Math.random() * 40) + 40, unit: '%' },
+                    { title: 'Wind Speed', value: Math.floor(Math.random() * 15) + 5, unit: 'km/h' }
+                ];
+                
+                dataGrid.innerHTML = '';
+                
+                cards.forEach((card, index) => {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'data-card';
+                    cardElement.innerHTML = `
+                        <h3>${card.title}</h3>
+                        <div class="value">${card.value} ${card.unit}</div>
+                    `;
+                    dataGrid.appendChild(cardElement);
+                    
+                    // Observe the new card
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                entry.target.classList.add('visible');
+                            }
+                        });
+                    }, { threshold: 0.1 });
+                    
+                    observer.observe(cardElement);
+                });
+            }
+
+            updateRecommendations() {
+                if (!this.airQualityData) return;
+                
+                const aqi = this.airQualityData.currentAQI;
+                const recommendations = [];
+                
+                if (aqi <= 50) {
+                    recommendations.push('Perfect for outdoor activities');
+                    recommendations.push('Great time for jogging or cycling');
+                    recommendations.push('Windows can be opened for fresh air');
+                } else if (aqi <= 100) {
+                    recommendations.push('Moderate outdoor activities are fine');
+                    recommendations.push('Sensitive individuals should limit prolonged exposure');
+                    recommendations.push('Consider indoor activities for children');
+                } else {
+                    recommendations.push('Limit outdoor activities');
+                    recommendations.push('Use air purifiers indoors');
+                    recommendations.push('Wear masks when going outside');
+                    recommendations.push('Keep windows closed');
+                }
+                
+                
+                if (this.isLowBandwidth) {
+                    recommendations.push('Data updates optimized for slow network');
+                }
+                
+                const list = document.getElementById('recommendationsList');
+                list.innerHTML = recommendations.map(rec => `<li>${rec}</li>`).join('');
+            }
+
+            loadDataForCard(card) {
+                
+                setTimeout(() => {
+                    const valueElement = card.querySelector('.value');
+                    if (valueElement && valueElement.textContent === '...') {
+                        valueElement.textContent = Math.floor(Math.random() * 100) + ' μg/m³';
+                    }
+                }, Math.random() * 2000);
+            }
+
+            processAirQualityData() {
+                
+                if (this.airQualityData) {
+                  
+                    const hourlyData = this.airQualityData.hourlyData;
+                    const currentHour = new Date().getHours();
+                    const trend = this.calculateTrend(hourlyData, currentHour);
+                    
+                    
+                    if (trend > 0) {
+                        console.log('Air quality improving');
+                    } else if (trend < 0) {
+                        console.log('Air quality deteriorating');
+                    }
+                }
+            }
+
+            calculateTrend(data, currentHour) {
+                if (currentHour < 3) return 0;
+                
+                const recent = data.slice(currentHour - 3, currentHour);
+                const avgRecent = recent.reduce((sum, point) => sum + point.aqi, 0) / recent.length;
+                const current = data[currentHour].aqi;
+                
+                return current - avgRecent;
+            }
+
+            updateStatus(elementId, status, text) {
+                const indicator = document.getElementById(elementId);
+                const textElement = document.getElementById(elementId.replace('Status', 'Text'));
+                
+                indicator.className = `status-indicator status-${status}`;
+                if (textElement) {
+                    textElement.textContent = text;
+                }
+            }
+
+            updateDataCollectionFrequency(interval) {
+               
+                clearInterval(this.dataUpdateInterval);
+                this.dataUpdateInterval = setInterval(() => {
+                    this.simulateAirQualityData();
+                }, interval);
+            }
+        }
+
+       
+        document.addEventListener('DOMContentLoaded', () => {
+            new AirQualityMonitor();
+        });
+    </script>
+</body>
+</html>
